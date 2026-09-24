@@ -149,15 +149,25 @@ router.get('/', (req, res) => {
 
 // Get restaurant statistics - CORREGIDO
 router.get('/stats', (req, res) => {
+  // 可选 owner_id：商家仪表盘只统计自己名下的餐厅
+  const { owner_id } = req.query;
+  let whereClause = '';
+  const params = [];
+  if (owner_id) {
+    whereClause = ' WHERE owner_id = ?';
+    params.push(parseInt(owner_id));
+  }
+
   const query = `
-    SELECT 
+    SELECT
       COUNT(*) as total,
       COUNT(CASE WHEN status = 'active' THEN 1 END) as active,
       AVG(CAST(rating AS REAL)) as averageRating
     FROM restaurants
+    ${whereClause}
   `;
-  
-  db.get(query, (err, result) => {
+
+  db.get(query, params, (err, result) => {
     if (err) {
       console.error('Error en consulta de estadísticas:', err);
       return res.status(500).json({ message: '服务器错误' });

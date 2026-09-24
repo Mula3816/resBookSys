@@ -41,8 +41,8 @@ const restaurantService = {
     return response.data;
   },
 
-  getStats: async () => {
-    const response = await api.get('/restaurants/stats');
+  getStats: async (params = {}) => {
+    const response = await api.get('/restaurants/stats', { params });
     return response.data;
   },
 };

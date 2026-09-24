@@ -66,7 +66,8 @@ const AdminDashboard = () => {
         user?.role === 'admin'
           ? userService.getStats({ date_from: firstDay, date_to: lastDay })
           : Promise.resolve({ total: 0, active: 0 }),
-        restaurantService.getStats()
+        // 商家：餐厅统计只统计自己名下的店
+        restaurantService.getStats(user?.role === 'merchant' ? { owner_id: user.id } : {})
       ]);
 
       setStats({
@@ -103,11 +104,12 @@ const AdminDashboard = () => {
       });
       setRecentReservations(recentResponse.reservations || []);
 
-      // Obtener restaurantes top
+      // Obtener restaurantes top（商家只看自己的店）
       const topResponse = await restaurantService.getAll({
         limit: 5,
         sort: 'rating',
-        order: 'DESC'
+        order: 'DESC',
+        ...(user?.role === 'merchant' ? { owner_id: user.id } : {})
       });
       setTopRestaurants(topResponse.restaurants || []);
     } catch (error) {
