@@ -1,0 +1,75 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Database files
+*.db
+*.db-journal
+database/
+
+# Environment variables
+.env
+
+# Backend
+backend/node_modules/
+backend/database/
+backend/.env
+backend/npm-debug.log*
+backend/yarn-debug.log*
+backend/yarn-error.log*
+
+# Frontend
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# Uploads
+backend/uploads/
+frontend/public/uploads/
+
+# Development and test files (already deleted)
+backend/checkTables.js
+backend/checkUsers.js
+backend/createAdmin.js
+backend/createTables.js
+backend/debug_register.js
+backend/improvedAvailability.js
+backend/test_register.ps1
+backend/migrate_payment_fields.js
+backend/check_payments.js
+backend/check_table.js
+backend/scripts/insertSampleData.js
+backend/scripts/insertSampleReservations.js
+backend/scripts/insertSampleUsers.js
+backend/scripts/resetAndInitialize.js
