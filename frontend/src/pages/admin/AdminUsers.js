@@ -106,6 +106,7 @@ const AdminUsers = () => {
             >
               <option value="">全部角色</option>
               <option value="admin">管理员</option>
+              <option value="merchant">商家</option>
               <option value="client">客户</option>
             </select>
 
@@ -142,8 +143,8 @@ const AdminUsers = () => {
                         <h3 className="text-lg font-semibold text-gray-900">
                           {user.name}
                         </h3>
-                        <Badge variant={user.role === 'admin' ? 'primary' : 'default'}>
-                          {user.role === 'admin' ? '管理员' : '客户'}
+                        <Badge variant={user.role === 'admin' ? 'primary' : user.role === 'merchant' ? 'success' : 'default'}>
+                          {user.role === 'admin' ? '管理员' : user.role === 'merchant' ? '商家' : '客户'}
                         </Badge>
                       </div>
 
@@ -185,6 +186,17 @@ const AdminUsers = () => {
                           variant="outline"
                           size="sm"
                           onClick={() => handleRoleUpdate(user.id, 'client')}
+                        >
+                          <User className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {user.role === 'merchant' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRoleUpdate(user.id, 'client')}
+                          title="降级为客户"
                         >
                           <User className="h-4 w-4" />
                         </Button>

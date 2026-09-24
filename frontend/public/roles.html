@@ -7,7 +7,7 @@
 <style>
   :root {
     --ink: #1e293b; --muted: #64748b; --line: #e2e8f0;
-    --admin: #4f46e5; --client: #0ea5e9; --guest: #94a3b8;
+    --admin: #4f46e5; --merchant: #16a34a; --client: #0ea5e9; --guest: #94a3b8;
     --ok-bg: #dcfce7; --ok-fg: #166534; --no-bg: #fef2f2; --no-fg: #b91c1c;
   }
   * { box-sizing: border-box; }
@@ -16,55 +16,56 @@
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
     background: #f8fafc;
   }
-  .wrap { max-width: 960px; margin: 0 auto; }
+  .wrap { max-width: 1000px; margin: 0 auto; }
   h1 { font-size: 26px; margin: 0 0 6px; }
   .sub { color: var(--muted); margin: 0 0 32px; font-size: 14px; }
   h2 { font-size: 18px; margin: 40px 0 16px; padding-left: 10px; border-left: 4px solid var(--admin); }
   .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 24px 28px; box-shadow: 0 1px 3px rgba(15,23,42,.05); }
 
   /* ===== 层级图 ===== */
-  .diagram { display: flex; gap: 40px; align-items: center; flex-wrap: wrap; }
+  .diagram { display: flex; gap: 36px; align-items: center; flex-wrap: wrap; }
   .rings { flex: 0 0 auto; }
-  .legend { flex: 1 1 320px; min-width: 280px; }
-  .ring-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px; }
+  .legend { flex: 1 1 360px; min-width: 300px; }
+  .ring-item { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 14px; }
   .dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 4px; flex: 0 0 auto; }
   .ring-item strong { display: block; margin-bottom: 2px; }
-  .ring-item ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; line-height: 1.75; }
+  .ring-item ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.7; }
 
   /* ===== 权限矩阵 ===== */
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: center; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 9px 10px; border-bottom: 1px solid var(--line); text-align: center; }
   th { background: #f1f5f9; font-weight: 600; white-space: nowrap; }
   th:first-child, td:first-child { text-align: left; }
   td:first-child { font-weight: 500; }
-  .yes { color: var(--ok-fg); background: var(--ok-bg); border-radius: 6px; display: inline-block; padding: 2px 10px; font-size: 13px; }
-  .no { color: var(--no-fg); background: var(--no-bg); border-radius: 6px; display: inline-block; padding: 2px 10px; font-size: 13px; }
+  .yes { color: var(--ok-fg); background: var(--ok-bg); border-radius: 6px; display: inline-block; padding: 2px 8px; font-size: 12.5px; }
+  .no { color: var(--no-fg); background: var(--no-bg); border-radius: 6px; display: inline-block; padding: 2px 8px; font-size: 12.5px; }
   .note { color: var(--muted); font-size: 12.5px; margin-top: 14px; line-height: 1.8; }
 
-  /* ===== 徽章 ===== */
-  .b-admin { color: var(--admin); } .b-client { color: var(--client); } .b-guest { color: var(--guest); }
-  .warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; color: #92400e; margin-top: 24px; }
+  .b-admin { color: var(--admin); } .b-merchant { color: var(--merchant); } .b-client { color: var(--client); } .b-guest { color: var(--guest); }
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>餐厅预订系统 · 角色与权限</h1>
-  <p class="sub">restaurant-booking-system · 基于后端路由中间件（authenticateToken / requireAdmin）与前端路由守卫的实际代码梳理</p>
+  <p class="sub">restaurant-booking-system · 基于后端路由中间件（authenticateToken / requireAdmin / requireMerchantOrAdmin）与前端路由守卫的实际代码梳理</p>
 
   <h2>一、角色层级图</h2>
   <div class="card">
     <div class="diagram">
       <div class="rings">
-        <svg width="360" height="360" viewBox="0 0 360 360">
-          <circle cx="180" cy="180" r="165" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
-          <circle cx="180" cy="180" r="116" fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
-          <circle cx="180" cy="180" r="66"  fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
-          <text x="180" y="52"  text-anchor="middle" font-size="15" font-weight="700" fill="#4f46e5">管理员 admin</text>
-          <text x="180" y="52"  text-anchor="middle" font-size="12" fill="#6b7280" dy="18">全部权限</text>
-          <text x="180" y="112" text-anchor="middle" font-size="14" font-weight="700" fill="#0369a1">客户 client</text>
-          <text x="180" y="112" text-anchor="middle" font-size="11" fill="#6b7280" dy="16">浏览 + 预订 + 个人资料</text>
-          <text x="180" y="180" text-anchor="middle" font-size="13" font-weight="700" fill="#475569">游客</text>
-          <text x="180" y="180" text-anchor="middle" font-size="11" fill="#6b7280" dy="16">仅浏览与注册登录</text>
+        <svg width="390" height="390" viewBox="0 0 390 390">
+          <circle cx="195" cy="195" r="185" fill="#eef2ff" stroke="#4f46e5" stroke-width="2"/>
+          <circle cx="195" cy="195" r="138" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+          <circle cx="195" cy="195" r="92"  fill="#e0f2fe" stroke="#0ea5e9" stroke-width="2"/>
+          <circle cx="195" cy="195" r="48"  fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+          <text x="195" y="32"  text-anchor="middle" font-size="15" font-weight="700" fill="#4f46e5">管理员 admin</text>
+          <text x="195" y="32"  text-anchor="middle" font-size="12" fill="#6b7280" dy="18">全部权限 + 管理所有用户</text>
+          <text x="195" y="92"  text-anchor="middle" font-size="14" font-weight="700" fill="#15803d">商家 merchant</text>
+          <text x="195" y="92"  text-anchor="middle" font-size="11" fill="#6b7280" dy="16">开店 + 管理自己店的一切</text>
+          <text x="195" y="152" text-anchor="middle" font-size="13" font-weight="700" fill="#0369a1">客户 client</text>
+          <text x="195" y="152" text-anchor="middle" font-size="11" fill="#6b7280" dy="16">浏览 + 预订 + 个人资料</text>
+          <text x="195" y="195" text-anchor="middle" font-size="12" font-weight="700" fill="#475569">游客</text>
+          <text x="195" y="195" text-anchor="middle" font-size="10.5" fill="#6b7280" dy="15">仅浏览与注册登录</text>
         </svg>
       </div>
       <div class="legend">
@@ -72,23 +73,34 @@
           <span class="dot" style="background:var(--admin)"></span>
           <div><strong class="b-admin">管理员（admin）— 系统最高权限</strong>
             <ul>
+              <li>商家与客户的全部能力</li>
+              <li>餐厅/桌台管理：所有餐厅（含商家店，可干预）</li>
+              <li>预订管理：查看全部、改状态、登记付款、删除</li>
+              <li>用户管理：查看全部、调整角色（客户↔商家↔管理员）、删除账号</li>
+              <li>平台级仪表盘统计</li>
+            </ul>
+          </div>
+        </div>
+        <div class="ring-item">
+          <span class="dot" style="background:var(--merchant)"></span>
+          <div><strong class="b-merchant">商家（merchant）— 注册时选择"我是商家"</strong>
+            <ul>
               <li>客户的全部能力</li>
-              <li>餐厅管理：新增 / 编辑 / 删除、上传图片</li>
-              <li>桌台管理：新增 / 编辑 / 删除</li>
-              <li>预订管理：查看全部、改状态（确认/完成/未到场）、登记付款、删除</li>
-              <li>用户管理：查看全部、修改角色、删除账号</li>
-              <li>管理仪表盘：统计报表、热门餐厅</li>
+              <li>开店：创建餐厅自动归属本人，自设营业时间</li>
+              <li>管理自己店的桌台、预订（改状态/登记付款/删除）、统计</li>
+              <li>数据隔离：看不到也改不了他人餐厅的任何数据</li>
+              <li>不可访问用户管理</li>
             </ul>
           </div>
         </div>
         <div class="ring-item">
           <span class="dot" style="background:var(--client)"></span>
-          <div><strong class="b-client">客户（client）— 注册即得</strong>
+          <div><strong class="b-client">客户（client）— 注册默认角色</strong>
             <ul>
               <li>游客的全部能力</li>
-              <li>查看 / 编辑自己的个人资料</li>
+              <li>查看/编辑自己的个人资料</li>
               <li>创建预订、查看自己的预订列表与详情</li>
-              <li>取消自己的预订（待处理 / 已确认状态）</li>
+              <li>取消自己的预订（待处理/已确认状态）</li>
             </ul>
           </div>
         </div>
@@ -96,9 +108,9 @@
           <span class="dot" style="background:var(--guest)"></span>
           <div><strong class="b-guest">游客（未登录）</strong>
             <ul>
-              <li>浏览首页、餐厅列表（搜索 / 菜系筛选）、餐厅详情</li>
+              <li>浏览首页、餐厅列表（搜索/菜系筛选）、餐厅详情</li>
               <li>查看桌台与可用时段</li>
-              <li>注册账号、登录</li>
+              <li>注册账号（顾客/商家）、登录</li>
             </ul>
           </div>
         </div>
@@ -111,38 +123,36 @@
     <table>
       <thead>
         <tr>
-          <th style="width:34%">操作</th>
+          <th style="width:31%">操作</th>
           <th>游客</th>
           <th>客户</th>
+          <th>商家</th>
           <th>管理员</th>
         </tr>
       </thead>
       <tbody>
-        <tr><td>浏览首页 / 餐厅列表 / 筛选 / 详情</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>查看桌台与可用时段</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>注册 / 登录</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>查看 / 编辑个人资料</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>创建预订</td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>查看预订列表 / 详情</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的</span></td><td><span class="yes">✓ 全部</span></td></tr>
-        <tr><td>取消预订</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的（未完成）</span></td><td><span class="yes">✓ 任何</span></td></tr>
-        <tr><td>修改预订状态（确认 / 完成 / 未到场…）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>登记付款（¥ 金额 / 支付方式）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>删除预订</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅已完成 / 已取消</span></td></tr>
-        <tr><td>餐厅管理（增 / 改 / 删 / 图片上传）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>桌台管理（增 / 改 / 删）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>用户管理（查看 / 改角色 / 删除）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
-        <tr><td>管理仪表盘与统计</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>浏览首页 / 餐厅列表 / 筛选 / 详情</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>查看桌台与可用时段</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>注册 / 登录（注册可选顾客或商家）</td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>查看 / 编辑个人资料</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>创建预订</td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>查看预订列表 / 详情</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的</span></td><td><span class="yes">✓ 仅自己店的</span></td><td><span class="yes">✓ 全部</span></td></tr>
+        <tr><td>取消预订</td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的（未完成）</span></td><td><span class="yes">✓ 仅自己的（未完成）</span></td><td><span class="yes">✓ 任何</span></td></tr>
+        <tr><td>修改预订状态（确认/完成/未到场…）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己店的</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>登记付款（¥ 金额 / 支付方式）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己店的</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>删除预订</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己店的（已完成/已取消）</span></td><td><span class="yes">✓ 仅已完成/已取消</span></td></tr>
+        <tr><td>餐厅管理（开店 / 改 / 删）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的店</span></td><td><span class="yes">✓ 全部</span></td></tr>
+        <tr><td>桌台管理（增 / 改 / 删）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己的店</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>用户管理（查看 / 改角色 / 删除）</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓</span></td></tr>
+        <tr><td>管理仪表盘与统计</td><td><span class="no">✗</span></td><td><span class="no">✗</span></td><td><span class="yes">✓ 仅自己店（不含平台用户数）</span></td><td><span class="yes">✓</span></td></tr>
       </tbody>
     </table>
     <p class="note">
-      • 权限在两层同时生效：后端中间件强制校验（越权返回 401「需要提供身份验证令牌」/ 403「需要管理员权限」），前端路由守卫负责隐藏入口（ProtectedRoute 需登录、AdminRoute 需 admin 角色）。<br>
+      • 权限在两层同时生效：后端中间件强制校验（越权返回 401「需要提供身份验证令牌」/ 403「需要管理员权限」「需要管理员或商家权限」「无权操作其他商家的餐厅」），前端路由守卫负责隐藏入口（ProtectedRoute 需登录、AdminRoute 需 admin/merchant，「用户管理」页面仅 admin）。<br>
       • 业务规则：桌台 2 小时占用窗口的可用性检查对所有人一致；预订状态流转 pending → confirmed → completed / cancelled / no_show；付款仅可对「已完成」预订登记。<br>
-      • 角色存于 users.role 字段，后端仅接受 admin / client 两种取值。
+      • 角色存于 users.role 字段，后端接受 admin / merchant / client 三种取值；注册接口仅允许 client / merchant（防提权）。<br>
+      • 商家数据隔离：餐厅归属存于 restaurants.owner_id；删除商家账号时其餐厅自动转平台自营。
     </p>
-  </div>
-
-  <div class="warn">
-    ⚠️ 代码中发现一处不一致：前端「用户管理」的角色下拉框提供了第三个选项「经理（manager）」，但后端角色校验只接受 admin / client，选择「经理」保存会被拒绝（400 角色无效）。如需修复请告知。
   </div>
 </div>
 </body>

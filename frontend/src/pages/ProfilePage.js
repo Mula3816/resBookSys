@@ -142,7 +142,7 @@ const ProfilePage = () => {
                   <div>
                     <p className="text-sm text-gray-600">角色</p>
                     <p className="font-medium text-gray-900">
-                      {user?.role === 'admin' ? '管理员' : '客户'}
+                      {user?.role === 'admin' ? '管理员' : user?.role === 'merchant' ? '商家' : '客户'}
                     </p>
                   </div>
                 </div>

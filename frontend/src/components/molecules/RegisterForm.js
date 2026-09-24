@@ -9,9 +9,10 @@ import toast from 'react-hot-toast';
 
 const RegisterForm = () => {
   const [loading, setLoading] = useState(false);
+  const [accountType, setAccountType] = useState('client');
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
-  
+
   const {
     register,
     handleSubmit,
@@ -30,7 +31,8 @@ const RegisterForm = () => {
         name: data.name,
         email: data.email,
         password: data.password,
-        phone: data.phone
+        phone: data.phone,
+        role: accountType
       });
       
       console.log('注册结果:', result);
@@ -53,6 +55,39 @@ const RegisterForm = () => {
   return (
     <div className="w-full max-w-md mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* 账号类型选择：客户 / 商家 */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            账号类型
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAccountType('client')}
+              className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                accountType === 'client'
+                  ? 'border-primary-600 bg-primary-50 text-primary-700'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              🍽 我是顾客
+              <span className="block text-xs font-normal text-gray-500 mt-0.5">浏览餐厅并预订</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType('merchant')}
+              className={`px-4 py-3 rounded-lg border-2 text-sm font-medium transition-colors ${
+                accountType === 'merchant'
+                  ? 'border-primary-600 bg-primary-50 text-primary-700'
+                  : 'border-gray-200 text-gray-600 hover:border-gray-300'
+              }`}
+            >
+              🏪 我是商家
+              <span className="block text-xs font-normal text-gray-500 mt-0.5">开店并管理预订</span>
+            </button>
+          </div>
+        </div>
+
         <div>
           <Input
             label="姓名"

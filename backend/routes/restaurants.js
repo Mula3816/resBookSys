@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const multer = require('multer');
 const path = require('path');
 const { db } = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireMerchantOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -51,13 +51,13 @@ const handleMulterError = (err, req, res, next) => {
 
 // Get all restaurants
 router.get('/', (req, res) => {
-  const { page = 1, limit = 12, search, cuisine_type, min_rating, max_rating } = req.query;
+  const { page = 1, limit = 12, search, cuisine_type, min_rating, max_rating, owner_id } = req.query;
   const offset = (page - 1) * limit;
 
   let query = `
-    SELECT r.*, 
+    SELECT r.*,
            (SELECT COUNT(*) FROM reservations WHERE restaurant_id = r.id AND status = 'confirmed') as total_reservations
-    FROM restaurants r 
+    FROM restaurants r
     WHERE 1=1
   `;
   const params = [];
@@ -70,6 +70,11 @@ router.get('/', (req, res) => {
   if (cuisine_type) {
     query += ` AND r.cuisine_type = ?`;
     params.push(cuisine_type);
+  }
+
+  if (owner_id) {
+    query += ` AND r.owner_id = ?`;
+    params.push(parseInt(owner_id));
   }
 
   if (min_rating) {
@@ -107,6 +112,11 @@ router.get('/', (req, res) => {
     if (cuisine_type) {
       countQuery += ` AND r.cuisine_type = ?`;
       countParams.push(cuisine_type);
+    }
+
+    if (owner_id) {
+      countQuery += ` AND r.owner_id = ?`;
+      countParams.push(parseInt(owner_id));
     }
 
     if (min_rating) {
@@ -215,7 +225,7 @@ router.get('/:id', (req, res) => {
 });
 
 // Create restaurant (admin only)
-router.post('/', authenticateToken, requireAdmin, upload.single('image'), [
+router.post('/', authenticateToken, requireMerchantOrAdmin, upload.single('image'), [
   body('name').trim().isLength({ min: 2, max: 100 }).withMessage('姓名长度必须为 2-100 个字符'),
   body('description').trim().isLength({ min: 10, max: 1000 }).withMessage('描述长度必须为 10-1000 个字符'),
   body('cuisine_type').trim().isIn(['秘鲁菜', '日料', '意大利菜', '法餐', '墨西哥菜', '西班牙菜', '中餐', '泰餐', '国际融合菜', '素食', '印度菜', '美式', '地中海菜', '融合菜']).withMessage('菜系类型无效'),
@@ -227,7 +237,9 @@ router.post('/', authenticateToken, requireAdmin, upload.single('image'), [
   body('capacity').isInt({ min: 1, max: 1000 }).withMessage('容量必须介于 1 到 1000 之间'),
   body('rating').optional().isFloat({ min: 0, max: 5 }).withMessage('评分必须介于 0 到 5 之间'),
   body('status').trim().isIn(['active', 'inactive']).withMessage('状态无效'),
-  body('image').optional().trim().isLength({ min: 0, max: 500 }).withMessage('图片 URL 无效')
+  body('image').optional().trim().isLength({ min: 0, max: 500 }).withMessage('图片 URL 无效'),
+  // 仅管理员可指定 owner_id（分配给商家）；商家创建时强制归属自己
+  body('owner_id').optional().isInt({ min: 1 }).withMessage('归属人 ID 无效')
 ], (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -256,14 +268,19 @@ router.post('/', authenticateToken, requireAdmin, upload.single('image'), [
     imageUrl = `/uploads/${req.file.filename}`;
   }
 
+  // 归属：商家开店强制归自己；管理员可指定 owner_id（不指定则为平台自营）
+  const ownerId = req.user.role === 'merchant'
+    ? req.user.id
+    : (req.body.owner_id ? parseInt(req.body.owner_id) : null);
+
   db.run(`
     INSERT INTO restaurants (
       name, description, cuisine_type, address, phone, email,
-      opening_time, closing_time, capacity, rating, status, image, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+      opening_time, closing_time, capacity, rating, status, image, owner_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
   `, [
     name, description, cuisine_type, address, phone, email,
-    opening_time, closing_time, capacity, rating || 0, status, imageUrl
+    opening_time, closing_time, capacity, rating || 0, status, imageUrl, ownerId
   ], function(err) {
     if (err) {
       console.error('Error creating restaurant:', err);
@@ -277,9 +294,26 @@ router.post('/', authenticateToken, requireAdmin, upload.single('image'), [
   });
 });
 
-// Update restaurant (admin only)
-router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), handleMulterError, (req, res) => {
+// Update restaurant (admin or owning merchant)
+router.put('/:id', authenticateToken, requireMerchantOrAdmin, upload.single('image'), handleMulterError, (req, res) => {
   const { id } = req.params;
+
+  // 商家只能修改自己名下的餐厅
+  const ownershipCheck = req.user.role === 'merchant'
+    ? new Promise((resolve, reject) => {
+        db.get('SELECT owner_id FROM restaurants WHERE id = ?', [id], (err, row) => {
+          if (err) reject(err);
+          else if (!row) resolve(null);
+          else if (row.owner_id !== req.user.id) {
+            const e = new Error('unauthorized');
+            e.status = 403;
+            reject(e);
+          } else resolve(row);
+        });
+      })
+    : Promise.resolve({});
+
+  ownershipCheck.then(() => {
   const updateFields = {};
   const updateValues = [];
 
@@ -332,6 +366,13 @@ router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), hand
       });
     }
   );
+  }).catch((err) => {
+    if (err && err.status === 403) {
+      return res.status(403).json({ message: '无权操作其他商家的餐厅' });
+    }
+    console.error('Error updating restaurant:', err);
+    return res.status(500).json({ message: '更新餐厅失败' });
+  });
 });
 
 // Get restaurant availability for specific date - MEJORADO
@@ -453,19 +494,42 @@ router.get('/:id/availability', (req, res) => {
 });
 
 // Delete restaurant (admin only)
-router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
+router.delete('/:id', authenticateToken, requireMerchantOrAdmin, (req, res) => {
   const { id } = req.params;
 
-  db.run('DELETE FROM restaurants WHERE id = ?', [id], function(err) {
-    if (err) {
-      return res.status(500).json({ message: '删除餐厅失败' });
-    }
+  // 商家只能删除自己名下的餐厅
+  const ownershipCheck = req.user.role === 'merchant'
+    ? new Promise((resolve, reject) => {
+        db.get('SELECT owner_id FROM restaurants WHERE id = ?', [id], (err, row) => {
+          if (err) reject(err);
+          else if (!row) resolve(null);
+          else if (row.owner_id !== req.user.id) {
+            const e = new Error('unauthorized');
+            e.status = 403;
+            reject(e);
+          } else resolve(row);
+        });
+      })
+    : Promise.resolve({});
 
-    if (this.changes === 0) {
-      return res.status(404).json({ message: '餐厅不存在' });
-    }
+  ownershipCheck.then(() => {
+    db.run('DELETE FROM restaurants WHERE id = ?', [id], function(err) {
+      if (err) {
+        return res.status(500).json({ message: '删除餐厅失败' });
+      }
 
-    res.json({ message: '餐厅删除成功' });
+      if (this.changes === 0) {
+        return res.status(404).json({ message: '餐厅不存在' });
+      }
+
+      res.json({ message: '餐厅删除成功' });
+    });
+  }).catch((err) => {
+    if (err && err.status === 403) {
+      return res.status(403).json({ message: '无权操作其他商家的餐厅' });
+    }
+    console.error('Error deleting restaurant:', err);
+    return res.status(500).json({ message: '删除餐厅失败' });
   });
 });
 

@@ -30,7 +30,7 @@ const UserForm = ({ user, onClose, onSuccess }) => {
 
   const roles = [
     { value: 'admin', label: '管理员' },
-    { value: 'manager', label: '经理' },
+    { value: 'merchant', label: '商家' },
     { value: 'client', label: '客户' }
   ];
 

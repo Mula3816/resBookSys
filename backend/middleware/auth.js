@@ -27,6 +27,28 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
+// Admin or merchant role middleware（管理后台入口；数据范围在各自路由内过滤）
+const requireMerchantOrAdmin = (req, res, next) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'merchant') {
+    return res.status(403).json({ message: '需要管理员或商家权限' });
+  }
+  next();
+};
+
+// 查询某商家名下的餐厅 ID 列表（数据隔离用）
+const getUserRestaurantIds = (userId) => {
+  return new Promise((resolve, reject) => {
+    db.all(
+      'SELECT id FROM restaurants WHERE owner_id = ?',
+      [userId],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows.map((row) => row.id));
+      }
+    );
+  });
+};
+
 // Get user from database
 const getUserFromDB = (userId) => {
   return new Promise((resolve, reject) => {
@@ -44,5 +66,7 @@ const getUserFromDB = (userId) => {
 module.exports = {
   authenticateToken,
   requireAdmin,
+  requireMerchantOrAdmin,
+  getUserRestaurantIds,
   getUserFromDB
 };

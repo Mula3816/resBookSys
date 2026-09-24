@@ -83,7 +83,7 @@ function App() {
           <Route path="restaurants" element={<AdminRestaurants />} />
           <Route path="tables" element={<AdminTables />} />
           <Route path="reservations" element={<AdminReservations />} />
-          <Route path="users" element={<AdminUsers />} />
+          <Route path="users" element={user?.role === 'admin' ? <AdminUsers /> : <Navigate to="/admin" replace />} />
         </Route>
 
         {/* 404 */}

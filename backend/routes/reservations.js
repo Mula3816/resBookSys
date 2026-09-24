@@ -1,7 +1,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { db } = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireMerchantOrAdmin, getUserRestaurantIds } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -11,76 +11,95 @@ function generateConfirmationCode() {
 }
 
 // Get all reservations (with filters)
-router.get('/', authenticateToken, (req, res) => {
-  const { 
-    page = 1, 
-    limit = 10, 
-    status, 
-    restaurant_id, 
-    date_from, 
+router.get('/', authenticateToken, async (req, res) => {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    restaurant_id,
+    date_from,
     date_to,
-    user_id 
+    user_id
   } = req.query;
-  
+
   const offset = (page - 1) * limit;
   const isAdmin = req.user.role === 'admin';
+  const isMerchant = req.user.role === 'merchant';
 
-  let query = `
-    SELECT r.*, 
-           u.name as user_name, u.email as user_email,
-           rest.name as restaurant_name,
-           t.table_number
-    FROM reservations r
-    JOIN users u ON r.user_id = u.id
-    JOIN restaurants rest ON r.restaurant_id = rest.id
-    JOIN tables t ON r.table_id = t.id
-    WHERE 1=1
-  `;
-  
-  let params = [];
-
-  // Non-admin users can only see their own reservations
-  if (!isAdmin) {
-    query += ' AND r.user_id = ?';
-    params.push(req.user.id);
-  } else if (user_id) {
-    query += ' AND r.user_id = ?';
-    params.push(user_id);
-  }
-
-  if (status) {
-    query += ' AND r.status = ?';
-    params.push(status);
-  }
-
-  if (restaurant_id) {
-    query += ' AND r.restaurant_id = ?';
-    params.push(restaurant_id);
-  }
-
-  if (date_from) {
-    query += ' AND r.reservation_date >= ?';
-    params.push(date_from);
-  }
-
-  if (date_to) {
-    query += ' AND r.reservation_date <= ?';
-    params.push(date_to);
-  }
-
-  query += ' ORDER BY r.reservation_date DESC, r.reservation_time DESC LIMIT ? OFFSET ?';
-  params.push(parseInt(limit), parseInt(offset));
-
-  db.all(query, params, (err, reservations) => {
-    if (err) {
-      return res.status(500).json({ message: '服务器错误' });
+  try {
+    // 商家范围：只能看自己名下餐厅的预订
+    let merchantRestaurantIds = [];
+    if (isMerchant) {
+      merchantRestaurantIds = await getUserRestaurantIds(req.user.id);
+      if (merchantRestaurantIds.length === 0) {
+        return res.json({
+          reservations: [],
+          pagination: { page: parseInt(page), limit: parseInt(limit), total: 0, pages: 0 }
+        });
+      }
     }
+
+    let query = `
+      SELECT r.*,
+             u.name as user_name, u.email as user_email,
+             rest.name as restaurant_name,
+             t.table_number
+      FROM reservations r
+      JOIN users u ON r.user_id = u.id
+      JOIN restaurants rest ON r.restaurant_id = rest.id
+      JOIN tables t ON r.table_id = t.id
+      WHERE 1=1
+    `;
+
+    let params = [];
+
+    // 客户：只能看自己的；商家：只能看自己店的；管理员：全部（可按 user_id 过滤）
+    if (isMerchant) {
+      query += ` AND r.restaurant_id IN (${merchantRestaurantIds.map(() => '?').join(',')})`;
+      params.push(...merchantRestaurantIds);
+    } else if (!isAdmin) {
+      query += ' AND r.user_id = ?';
+      params.push(req.user.id);
+    } else if (user_id) {
+      query += ' AND r.user_id = ?';
+      params.push(user_id);
+    }
+
+    if (status) {
+      query += ' AND r.status = ?';
+      params.push(status);
+    }
+
+    if (restaurant_id) {
+      query += ' AND r.restaurant_id = ?';
+      params.push(restaurant_id);
+    }
+
+    if (date_from) {
+      query += ' AND r.reservation_date >= ?';
+      params.push(date_from);
+    }
+
+    if (date_to) {
+      query += ' AND r.reservation_date <= ?';
+      params.push(date_to);
+    }
+
+    query += ' ORDER BY r.reservation_date DESC, r.reservation_time DESC LIMIT ? OFFSET ?';
+    params.push(parseInt(limit), parseInt(offset));
+
+    const reservations = await new Promise((resolve, reject) => {
+      db.all(query, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+    });
 
     // Get total count
     let countQuery = 'SELECT COUNT(*) as total FROM reservations r WHERE 1=1';
     let countParams = [];
 
-    if (!isAdmin) {
+    if (isMerchant) {
+      countQuery += ` AND r.restaurant_id IN (${merchantRestaurantIds.map(() => '?').join(',')})`;
+      countParams.push(...merchantRestaurantIds);
+    } else if (!isAdmin) {
       countQuery += ' AND r.user_id = ?';
       countParams.push(req.user.id);
     } else if (user_id) {
@@ -108,31 +127,33 @@ router.get('/', authenticateToken, (req, res) => {
       countParams.push(date_to);
     }
 
-    db.get(countQuery, countParams, (err, countResult) => {
-      if (err) {
-        return res.status(500).json({ message: '服务器错误' });
-      }
-
-      res.json({
-        reservations,
-        pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
-          total: countResult.total,
-          pages: Math.ceil(countResult.total / limit)
-        }
-      });
+    const countResult = await new Promise((resolve, reject) => {
+      db.get(countQuery, countParams, (err, row) => (err ? reject(err) : resolve(row)));
     });
-  });
+
+    res.json({
+      reservations,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total: countResult.total,
+        pages: Math.ceil(countResult.total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching reservations:', error);
+    res.status(500).json({ message: '服务器错误' });
+  }
 });
 
 // Get reservation by ID
-router.get('/:id', authenticateToken, (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const isAdmin = req.user.role === 'admin';
+  const isMerchant = req.user.role === 'merchant';
 
   let query = `
-    SELECT r.*, 
+    SELECT r.*,
            u.name as user_name, u.email as user_email, u.phone as user_phone,
            rest.name as restaurant_name, rest.address as restaurant_address, rest.phone as restaurant_phone,
            t.table_number, t.capacity as table_capacity, t.location as table_location
@@ -143,11 +164,24 @@ router.get('/:id', authenticateToken, (req, res) => {
     WHERE r.id = ?
   `;
 
-  if (!isAdmin) {
-    query += ' AND r.user_id = ?';
-  }
+  const params = [id];
 
-  const params = isAdmin ? [id] : [id, req.user.id];
+  // 客户：只能看自己的；商家：只能看自己店里的；管理员：全部
+  if (isMerchant) {
+    try {
+      const ids = await getUserRestaurantIds(req.user.id);
+      if (ids.length === 0) {
+        return res.status(404).json({ message: '预订不存在' });
+      }
+      query += ` AND r.restaurant_id IN (${ids.map(() => '?').join(',')})`;
+      params.push(...ids);
+    } catch (error) {
+      return res.status(500).json({ message: '服务器错误' });
+    }
+  } else if (!isAdmin) {
+    query += ' AND r.user_id = ?';
+    params.push(req.user.id);
+  }
 
   db.get(query, params, (err, reservation) => {
     if (err) {
@@ -274,8 +308,25 @@ router.post('/', authenticateToken, [
   }
 });
 
-// Update reservation status (admin only)
-router.put('/:id/status', authenticateToken, requireAdmin, [
+// 商家单条预订权限校验：预订必须属于商家名下餐厅，否则视为不存在
+const ensureReservationScope = (req, reservationId) => {
+  if (req.user.role !== 'merchant') return Promise.resolve();
+  return getUserRestaurantIds(req.user.id).then((ids) => {
+    return new Promise((resolve, reject) => {
+      db.get('SELECT restaurant_id FROM reservations WHERE id = ?', [reservationId], (err, row) => {
+        if (err) reject(err);
+        else if (!row || !ids.includes(row.restaurant_id)) {
+          const e = new Error('notfound');
+          e.status = 404;
+          reject(e);
+        } else resolve();
+      });
+    });
+  });
+};
+
+// Update reservation status (admin or owning merchant)
+router.put('/:id/status', authenticateToken, requireMerchantOrAdmin, [
   body('status').isIn(['pending', 'confirmed', 'cancelled', 'completed', 'no_show']).withMessage('状态无效'),
   body('notes').optional().trim().isLength({ max: 500 })
 ], (req, res) => {
@@ -287,6 +338,7 @@ router.put('/:id/status', authenticateToken, requireAdmin, [
   const { id } = req.params;
   const { status, notes } = req.body;
 
+  ensureReservationScope(req, id).then(() => {
   // Get current reservation
   db.get('SELECT * FROM reservations WHERE id = ?', [id], (err, reservation) => {
     if (err) {
@@ -316,6 +368,13 @@ router.put('/:id/status', authenticateToken, requireAdmin, [
         res.json({ message: '预订状态更新成功' });
       }
     );
+  });
+  }).catch((err) => {
+    if (err && err.status === 404) {
+      return res.status(404).json({ message: '预订不存在' });
+    }
+    console.error('Error updating reservation status:', err);
+    return res.status(500).json({ message: '服务器错误' });
   });
 });
 
@@ -375,8 +434,8 @@ router.put('/:id/cancel', authenticateToken, [
   });
 });
 
-// Record payment for completed reservation (admin only)
-router.put('/:id/payment', authenticateToken, requireAdmin, [
+// Record payment for completed reservation (admin or owning merchant)
+router.put('/:id/payment', authenticateToken, requireMerchantOrAdmin, [
   body('total_amount').isFloat({ min: 0 }).withMessage('总金额必须为正数'),
   body('payment_method').optional().trim().isLength({ max: 50 }).withMessage('支付方式无效'),
   body('notes').optional().trim().isLength({ max: 200 }).withMessage('备注无效')
@@ -389,6 +448,7 @@ router.put('/:id/payment', authenticateToken, requireAdmin, [
   const { id } = req.params;
   const { total_amount, payment_method, notes } = req.body;
 
+  ensureReservationScope(req, id).then(() => {
   // Get current reservation
   db.get('SELECT * FROM reservations WHERE id = ?', [id], (err, reservation) => {
     if (err) {
@@ -425,7 +485,7 @@ router.put('/:id/payment', authenticateToken, requireAdmin, [
           [id, `已登记付款：¥${total_amount} ${payment_method ? `(${payment_method})` : ''} ${notes ? `- ${notes}` : ''}`, req.user.id]
         );
 
-        res.json({ 
+        res.json({
           message: '付款登记成功',
           payment: {
             total_amount,
@@ -437,13 +497,21 @@ router.put('/:id/payment', authenticateToken, requireAdmin, [
       }
     );
   });
+  }).catch((err) => {
+    if (err && err.status === 404) {
+      return res.status(404).json({ message: '预订不存在' });
+    }
+    console.error('Error recording payment:', err);
+    return res.status(500).json({ message: '服务器错误' });
+  });
 });
 
-// Delete reservation (admin only) - Solo permite eliminar completadas y canceladas
-router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
+// Delete reservation (admin or owning merchant) - 仅允许删除已完成和已取消的预订
+router.delete('/:id', authenticateToken, requireMerchantOrAdmin, (req, res) => {
   const { id } = req.params;
 
-  // Primero obtener la reserva para verificar su estado
+  ensureReservationScope(req, id).then(() => {
+  // 先获取预订以校验其状态
   db.get('SELECT * FROM reservations WHERE id = ?', [id], (err, reservation) => {
     if (err) {
       return res.status(500).json({ message: '删除预订失败' });
@@ -453,9 +521,9 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
       return res.status(404).json({ message: '预订不存在' });
     }
 
-    // Solo permitir eliminar reservas completadas o canceladas
+    // 仅允许删除已完成或已取消的预订
     if (reservation.status === 'pending' || reservation.status === 'confirmed') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: '无法删除待确认或已确认的预订。仅可删除已完成或已取消的预订。'
       });
     }
@@ -472,11 +540,37 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
       res.json({ message: '预订删除成功' });
     });
   });
+  }).catch((err) => {
+    if (err && err.status === 404) {
+      return res.status(404).json({ message: '预订不存在' });
+    }
+    console.error('Error deleting reservation:', err);
+    return res.status(500).json({ message: '删除预订失败' });
+  });
 });
 
-// Get reservation statistics (admin only)
-router.get('/stats/dashboard', authenticateToken, requireAdmin, (req, res) => {
+// Get reservation statistics (admin or owning merchant)
+router.get('/stats/dashboard', authenticateToken, requireMerchantOrAdmin, async (req, res) => {
   const { date_from, date_to, restaurant_id } = req.query;
+  const isMerchant = req.user.role === 'merchant';
+
+  // 商家统计范围：仅自己名下餐厅
+  let merchantIds = [];
+  if (isMerchant) {
+    try {
+      merchantIds = await getUserRestaurantIds(req.user.id);
+    } catch (error) {
+      return res.status(500).json({ message: '服务器错误' });
+    }
+    if (merchantIds.length === 0) {
+      return res.json({
+        total: 0, pending: 0, confirmed: 0, cancelled: 0, completed: 0,
+        revenue: 0, pendingRevenue: 0, totalUsers: 0,
+        activeRestaurants: 0, totalRestaurants: 0,
+        changes: { total: 0, pending: 0, confirmed: 0, cancelled: 0, completed: 0, revenue: 0, totalUsers: 0 }
+      });
+    }
+  }
 
   // Si no se especifican fechas, usar el mes actual
   const now = new Date();
@@ -507,6 +601,11 @@ router.get('/stats/dashboard', authenticateToken, requireAdmin, (req, res) => {
     params.push(restaurant_id);
   }
 
+  if (isMerchant) {
+    whereClause += ` AND restaurant_id IN (${merchantIds.map(() => '?').join(',')})`;
+    params.push(...merchantIds);
+  }
+
   // Calcular fechas del período anterior para comparación
   const currentStartDate = new Date(defaultDateFrom);
   const currentEndDate = new Date(defaultDateTo);
@@ -527,6 +626,12 @@ router.get('/stats/dashboard', authenticateToken, requireAdmin, (req, res) => {
     previousWhereClause += ' AND restaurant_id = ?';
     previousParams.push(restaurant_id);
   }
+
+  if (isMerchant) {
+    previousWhereClause += ` AND restaurant_id IN (${merchantIds.map(() => '?').join(',')})`;
+    previousParams.push(...merchantIds);
+  }
+
   previousWhereClause += ' AND reservation_date >= ? AND reservation_date <= ?';
   previousParams.push(previousDateFrom, previousDateTo);
 
@@ -548,13 +653,21 @@ router.get('/stats/dashboard', authenticateToken, requireAdmin, (req, res) => {
     prevCompleted: `SELECT COUNT(*) as count FROM reservations ${previousWhereClause} AND status = 'completed'`,
     prevRevenue: `SELECT COALESCE(SUM(total_amount), 0) as total FROM reservations ${previousWhereClause} AND status = 'completed'`,
     
-    // Estadísticas de usuarios
-    totalUsers: `SELECT COUNT(*) as count FROM users WHERE created_at >= ? AND created_at <= ?`,
-    prevTotalUsers: `SELECT COUNT(*) as count FROM users WHERE created_at >= ? AND created_at <= ?`,
-    
-    // Estadísticas de restaurantes
-    totalRestaurants: `SELECT COUNT(*) as count FROM restaurants`,
-    activeRestaurants: `SELECT COUNT(*) as count FROM restaurants WHERE status = 'active'`
+    // Estadísticas de usuarios（商家不展示平台用户数据，返回 0）
+    totalUsers: isMerchant
+      ? `SELECT 0 as count`
+      : `SELECT COUNT(*) as count FROM users WHERE created_at >= ? AND created_at <= ?`,
+    prevTotalUsers: isMerchant
+      ? `SELECT 0 as count`
+      : `SELECT COUNT(*) as count FROM users WHERE created_at >= ? AND created_at <= ?`,
+
+    // Estadísticas de restaurantes（商家仅统计自己的店）
+    totalRestaurants: isMerchant
+      ? `SELECT COUNT(*) as count FROM restaurants WHERE owner_id = ?`
+      : `SELECT COUNT(*) as count FROM restaurants`,
+    activeRestaurants: isMerchant
+      ? `SELECT COUNT(*) as count FROM restaurants WHERE status = 'active' AND owner_id = ?`
+      : `SELECT COUNT(*) as count FROM restaurants WHERE status = 'active'`
   };
 
   const results = {};
@@ -564,17 +677,15 @@ router.get('/stats/dashboard', authenticateToken, requireAdmin, (req, res) => {
   Object.entries(queries).forEach(([key, query]) => {
     let queryParams = [];
     
-    if (key.startsWith('prev')) {
+    if (key === 'totalUsers') {
+      queryParams = isMerchant ? [] : [defaultDateFrom, defaultDateTo];
+    } else if (key === 'prevTotalUsers') {
+      queryParams = isMerchant ? [] : [previousDateFrom, previousDateTo];
+    } else if (key.startsWith('prev')) {
       queryParams = [...previousParams];
-    } else if (key === 'totalUsers' || key === 'prevTotalUsers') {
-      if (key === 'totalUsers') {
-        queryParams = [defaultDateFrom, defaultDateTo];
-      } else {
-        queryParams = [previousDateFrom, previousDateTo];
-      }
     } else if (key === 'totalRestaurants' || key === 'activeRestaurants') {
-      // Estas consultas no necesitan parámetros de fecha
-      queryParams = [];
+      // 商家按 owner_id 统计，admin 无需参数
+      queryParams = isMerchant ? [req.user.id] : [];
     } else {
       // Para las consultas de reservas (total, pending, confirmed, etc.)
       queryParams = [...params];

@@ -248,6 +248,7 @@ async function initializeCompleteSystem() {
     // 3. Insertar usuarios de muestra
     console.log('\n👥 Insertando usuarios...');
     const users = [
+      { name: "商家演示", email: "owner@restaurant.com", phone: "+51 987 000 001", role: "merchant", password: "owner123" },
       { name: "Carlos Rodríguez", email: "carlos.rodriguez@email.com", phone: "+51 987 654 321", role: "client" },
       { name: "María González", email: "maria.gonzalez@email.com", phone: "+51 987 654 322", role: "client" },
       { name: "Luis Fernández", email: "luis.fernandez@email.com", phone: "+51 987 654 323", role: "client" },
@@ -261,7 +262,7 @@ async function initializeCompleteSystem() {
     ];
 
     for (const user of users) {
-      const hashedPassword = await bcrypt.hash('password123', 10);
+      const hashedPassword = await bcrypt.hash(user.password || 'password123', 10);
       
       await new Promise((resolve, reject) => {
         db.run(`
@@ -283,6 +284,21 @@ async function initializeCompleteSystem() {
     }
 
     console.log(`✅ ${users.length} usuarios insertados`);
+
+    // 将 3 家餐厅分配给默认商家账号（其余餐厅为平台自营）
+    await new Promise((resolve, reject) => {
+      db.run(
+        `UPDATE restaurants SET owner_id = (SELECT id FROM users WHERE email = 'owner@restaurant.com')
+         WHERE name IN ('La Mar', 'Sakura Sushi Bar', 'Trattoria Italiana')`,
+        (err) => {
+          if (err) reject(err);
+          else {
+            console.log('🏪 已将 3 家餐厅分配给默认商家账号');
+            resolve();
+          }
+        }
+      );
+    });
 
     // 4. Insertar algunas reservas de ejemplo
     console.log('\n📅 Insertando reservas de ejemplo...');

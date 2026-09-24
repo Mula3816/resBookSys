@@ -13,7 +13,8 @@ const AdminRoute = ({ children }) => {
     );
   }
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  // 管理后台：管理员与商家均可进入（数据范围由后端按角色过滤）
+  if (!isAuthenticated || (user?.role !== 'admin' && user?.role !== 'merchant')) {
     return <Navigate to="/" replace />;
   }
 

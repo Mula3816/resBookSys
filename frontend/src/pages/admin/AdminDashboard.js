@@ -12,9 +12,11 @@ import Card, { CardContent, CardHeader } from '../../components/atoms/Card';
 import Badge from '../../components/atoms/Badge';
 import Button from '../../components/atoms/Button';
 import { formatCurrency, debounce } from '../../utils/helpers';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalReservations: 0,
     activeReservations: 0,
@@ -275,13 +277,15 @@ const AdminDashboard = () => {
           change={changes.activeReservations}
           color="green"
         />
-        <StatCard
-          icon={Users}
-          title="用户总数"
-          value={stats.totalUsers}
-          change={changes.totalUsers}
-          color="purple"
-        />
+        {user?.role === 'admin' && (
+          <StatCard
+            icon={Users}
+            title="用户总数"
+            value={stats.totalUsers}
+            change={changes.totalUsers}
+            color="purple"
+          />
+        )}
         <StatCard
           icon={Activity}
           title="营业中餐厅"
@@ -444,6 +448,7 @@ const AdminDashboard = () => {
               <Users className="h-4 w-4 mr-2" />
               查看预订
             </Button>
+            {user?.role === 'admin' && (
             <Button
               variant="outline"
               onClick={() => window.location.href = '/admin/users'}
@@ -452,6 +457,7 @@ const AdminDashboard = () => {
               <AlertCircle className="h-4 w-4 mr-2" />
               管理用户
             </Button>
+            )}
           </div>
         </CardContent>
       </Card>

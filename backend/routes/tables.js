@@ -1,13 +1,48 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { db } = require('../config/database');
-const { authenticateToken, requireAdmin } = require('../middleware/auth');
+const { authenticateToken, requireAdmin, requireMerchantOrAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
+// 商家校验：目标餐厅是否归其所有（admin 直接放行）
+const ensureRestaurantOwnership = (req, restaurantId) => {
+  if (req.user.role !== 'merchant') return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    db.get('SELECT owner_id FROM restaurants WHERE id = ?', [restaurantId], (err, row) => {
+      if (err) reject(err);
+      else if (!row || row.owner_id !== req.user.id) {
+        const e = new Error('unauthorized');
+        e.status = 403;
+        reject(e);
+      } else resolve();
+    });
+  });
+};
+
+// 统一处理商家越权错误
+const handleOwnershipError = (res, err, fallbackMessage) => {
+  if (err && err.status === 403) {
+    return res.status(403).json({ message: '无权操作其他商家的餐厅' });
+  }
+  return res.status(500).json({ message: fallbackMessage });
+};
+
+// 商家校验：目标桌台所属餐厅是否归其所有（admin 直接放行）
+const ensureTableOwnership = (req, tableId) => {
+  if (req.user.role !== 'merchant') return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    db.get('SELECT restaurant_id FROM tables WHERE id = ?', [tableId], (err, row) => {
+      if (err) reject(err);
+      else if (!row) resolve(); // 桌台不存在：交由后续 UPDATE 返回 404
+      else ensureRestaurantOwnership(req, row.restaurant_id).then(resolve).catch(reject);
+    });
+  });
+};
+
 // Get all tables (with optional restaurant filter)
 router.get('/', (req, res) => {
-  const { restaurant_id, status, search } = req.query;
+  const { restaurant_id, status, search, owner_id } = req.query;
 
   let query = `
     SELECT t.*, r.name as restaurant_name
@@ -20,6 +55,11 @@ router.get('/', (req, res) => {
   if (restaurant_id) {
     query += ' AND t.restaurant_id = ?';
     params.push(restaurant_id);
+  }
+
+  if (owner_id) {
+    query += ' AND r.owner_id = ?';
+    params.push(parseInt(owner_id));
   }
 
   if (search) {
@@ -67,8 +107,8 @@ router.get('/:id', (req, res) => {
   );
 });
 
-// Create table (admin only)
-router.post('/', authenticateToken, requireAdmin, [
+// Create table (admin or owning merchant)
+router.post('/', authenticateToken, requireMerchantOrAdmin, [
   body('restaurant_id').isInt({ min: 1 }).withMessage('餐厅 ID 无效'),
   body('table_number').trim().isLength({ min: 1, max: 10 }).withMessage('桌台编号无效'),
   body('capacity').isInt({ min: 1, max: 20 }).withMessage('容量必须介于 1 到 20 之间'),
@@ -87,6 +127,7 @@ router.post('/', authenticateToken, requireAdmin, [
     location, table_type = 'standard', status = 'available'
   } = req.body;
 
+  ensureRestaurantOwnership(req, restaurant_id).then(() => {
   // Check if table number already exists for this restaurant
   db.get(
     'SELECT id FROM tables WHERE restaurant_id = ? AND table_number = ?',
@@ -119,10 +160,11 @@ router.post('/', authenticateToken, requireAdmin, [
       );
     }
   );
+  }).catch((err) => handleOwnershipError(res, err, '创建桌台失败'));
 });
 
-// Update table (admin only)
-router.put('/:id', authenticateToken, requireAdmin, [
+// Update table (admin or owning merchant)
+router.put('/:id', authenticateToken, requireMerchantOrAdmin, [
   body('table_number').optional().trim().isLength({ min: 1, max: 10 }),
   body('capacity').optional().isInt({ min: 1, max: 20 }),
   body('min_capacity').optional().isInt({ min: 1, max: 20 }),
@@ -140,7 +182,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
   const values = [];
 
   const allowedFields = [
-    'table_number', 'capacity', 'min_capacity', 
+    'table_number', 'capacity', 'min_capacity',
     'location', 'table_type', 'status'
   ];
 
@@ -157,6 +199,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
 
   values.push(id);
 
+  ensureTableOwnership(req, id).then(() => {
   db.run(
     `UPDATE tables SET ${updates.join(', ')} WHERE id = ?`,
     values,
@@ -172,12 +215,14 @@ router.put('/:id', authenticateToken, requireAdmin, [
       res.json({ message: '桌台更新成功' });
     }
   );
+  }).catch((err) => handleOwnershipError(res, err, '更新桌台失败'));
 });
 
-// Delete table (admin only)
-router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
+// Delete table (admin or owning merchant)
+router.delete('/:id', authenticateToken, requireMerchantOrAdmin, (req, res) => {
   const { id } = req.params;
 
+  ensureTableOwnership(req, id).then(() => {
   // Check if table has existing reservations
   db.get(
     'SELECT id FROM reservations WHERE table_id = ? AND status IN ("pending", "confirmed")',
@@ -188,7 +233,7 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
       }
 
       if (reservation) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           message: '无法删除该桌台，其存在有效预订。'
         });
       }
@@ -206,6 +251,7 @@ router.delete('/:id', authenticateToken, requireAdmin, (req, res) => {
       });
     }
   );
+  }).catch((err) => handleOwnershipError(res, err, '删除桌台失败'));
 });
 
 // Get table availability for specific date

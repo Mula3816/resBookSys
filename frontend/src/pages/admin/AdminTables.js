@@ -7,6 +7,7 @@ import Input from '../../components/atoms/Input';
 import Card, { CardContent, CardHeader } from '../../components/atoms/Card';
 import Badge from '../../components/atoms/Badge';
 import TableForm from '../../components/molecules/TableForm';
+import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 
 // table_type 显示标签（数据库枚举值仍为英文，不可修改）
@@ -18,6 +19,7 @@ const TYPE_LABELS = {
 };
 
 const AdminTables = () => {
+  const { user } = useAuth();
   const [tables, setTables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -85,7 +87,11 @@ const AdminTables = () => {
   const fetchTables = async () => {
     try {
       setLoading(true);
-      const response = await tableService.getAll(filters);
+      // 商家只能看到自己名下餐厅的桌台
+      const params = user?.role === 'merchant'
+        ? { ...filters, owner_id: user.id }
+        : filters;
+      const response = await tableService.getAll(params);
       setTables(response.tables);
       setPagination(response.pagination);
     } catch (error) {

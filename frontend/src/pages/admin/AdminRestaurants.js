@@ -8,8 +8,10 @@ import Badge from '../../components/atoms/Badge';
 import RestaurantForm from '../../components/molecules/RestaurantForm';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '../../utils/helpers';
+import { useAuth } from '../../contexts/AuthContext';
 
 const AdminRestaurants = () => {
+  const { user } = useAuth();
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -34,7 +36,11 @@ const AdminRestaurants = () => {
   const fetchRestaurants = async () => {
     try {
       setLoading(true);
-      const response = await restaurantService.getAll(filters);
+      // 商家只能看到自己名下的餐厅
+      const params = user?.role === 'merchant'
+        ? { ...filters, owner_id: user.id }
+        : filters;
+      const response = await restaurantService.getAll(params);
       setRestaurants(response.restaurants);
       setPagination(response.pagination);
     } catch (error) {

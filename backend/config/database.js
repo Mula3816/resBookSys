@@ -57,10 +57,20 @@ async function initDatabase() {
           rating DECIMAL(3,2) DEFAULT 0.00,
           image VARCHAR(255),
           status VARCHAR(20) DEFAULT 'active',
+          owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
+
+      // 旧库迁移：restaurants 表补充 owner_id 列（商家角色）
+      db.run(`
+        ALTER TABLE restaurants ADD COLUMN owner_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+      `, (err) => {
+        if (err && !err.message.includes('duplicate column name')) {
+          console.error('⚠️ 迁移 owner_id 列失败:', err.message);
+        }
+      });
 
       // Tables table
       db.run(`

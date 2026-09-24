@@ -13,7 +13,9 @@ router.post('/register', [
   body('email').isEmail().normalizeEmail().withMessage('邮箱格式无效'),
   body('password').isLength({ min: 6 }).withMessage('密码长度至少为 6 个字符'),
   // 手机号选填：先去空格，空值/空串直接跳过校验（optional 默认只跳过 undefined）
-  body('phone').trim().optional({ values: 'falsy' }).isMobilePhone().withMessage('手机号无效')
+  body('phone').trim().optional({ values: 'falsy' }).isMobilePhone().withMessage('手机号无效'),
+  // 账号类型：仅允许客户或商家通过注册获得，管理员不可自助注册（防提权）
+  body('role').optional().isIn(['client', 'merchant']).withMessage('角色无效')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -22,6 +24,7 @@ router.post('/register', [
     }
 
     const { name, email, password, phone } = req.body;
+    const role = req.body.role === 'merchant' ? 'merchant' : 'client';
 
     // Check if user exists
     db.get('SELECT id FROM users WHERE email = ?', [email], async (err, user) => {
@@ -38,8 +41,8 @@ router.post('/register', [
 
       // Create user
       db.run(
-        `INSERT INTO users (name, email, password, phone) VALUES (?, ?, ?, ?)`,
-        [name, email, hashedPassword, phone || null],
+        `INSERT INTO users (name, email, password, phone, role) VALUES (?, ?, ?, ?, ?)`,
+        [name, email, hashedPassword, phone || null, role],
         function(err) {
           if (err) {
             return res.status(500).json({ message: '创建用户失败' });
@@ -47,7 +50,7 @@ router.post('/register', [
 
           // Create token
           const token = jwt.sign(
-            { id: this.lastID, email, role: 'client' },
+            { id: this.lastID, email, role },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN }
           );
@@ -60,7 +63,7 @@ router.post('/register', [
               name,
               email,
               phone,
-              role: 'client'
+              role
             }
           });
         }

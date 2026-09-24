@@ -37,7 +37,7 @@ const Header = () => {
   const userNavigation = [
     { name: '我的预订', href: '/reservations', icon: Calendar },
     { name: '我的资料', href: '/profile', icon: User },
-    ...(user?.role === 'admin' ? [
+    ...(user?.role === 'admin' || user?.role === 'merchant' ? [
       { name: '管理面板', href: '/admin', icon: Settings }
     ] : []),
   ];
