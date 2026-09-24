@@ -60,9 +60,12 @@ const AdminDashboard = () => {
       console.log(`获取统计数据区间：${firstDay} - ${lastDay}`);
       
       // Obtener estadísticas generales con fechas específicas
+      // 用户统计为管理员专属接口：商家不调用（403），用 0 占位
       const [reservationStats, userStats, restaurantStats] = await Promise.all([
         reservationService.getStats({ date_from: firstDay, date_to: lastDay }),
-        userService.getStats({ date_from: firstDay, date_to: lastDay }),
+        user?.role === 'admin'
+          ? userService.getStats({ date_from: firstDay, date_to: lastDay })
+          : Promise.resolve({ total: 0, active: 0 }),
         restaurantService.getStats()
       ]);
 

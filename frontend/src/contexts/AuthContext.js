@@ -45,7 +45,7 @@ const authReducer = (state, action) => {
 
 const initialState = {
   user: null,
-  token: localStorage.getItem('token'),
+  token: sessionStorage.getItem('token'),
   isAuthenticated: false,
   loading: true,
   error: null
@@ -56,7 +56,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const initAuth = async () => {
-      const token = localStorage.getItem('token');
+      // 清理旧版本存于 localStorage 的 token（现已改用 sessionStorage 按标签页隔离登录态）
+      localStorage.removeItem('token');
+      const token = sessionStorage.getItem('token');
       if (token) {
         try {
           api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
@@ -69,7 +71,7 @@ export const AuthProvider = ({ children }) => {
             }
           });
         } catch (error) {
-          localStorage.removeItem('token');
+          sessionStorage.removeItem('token');
           delete api.defaults.headers.common['Authorization'];
           dispatch({ type: 'LOGOUT' });
         }
@@ -87,7 +89,7 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/login', { email, password });
       const { token, user } = response.data;
       
-      localStorage.setItem('token', token);
+      sessionStorage.setItem('token', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       dispatch({
@@ -112,7 +114,7 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/auth/register', userData);
       const { token, user } = response.data;
       
-      localStorage.setItem('token', token);
+      sessionStorage.setItem('token', token);
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       dispatch({
@@ -154,7 +156,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
+    sessionStorage.removeItem('token');
     delete api.defaults.headers.common['Authorization'];
     dispatch({ type: 'LOGOUT' });
   };

@@ -14,7 +14,7 @@ const api = axios.create({
 // Interceptor para añadir token de autenticación
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -35,7 +35,7 @@ api.interceptors.response.use(
   (error) => {
     console.error('请求出错:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status);
     if (error.response?.status === 401) {
-      localStorage.removeItem('token');
+      sessionStorage.removeItem('token');
       // 仅在已登录页面遇到 401 时才跳转登录页；登录页本身的 401（密码错误）不跳转，保留错误提示
       if (window.location.pathname !== '/auth/login' && window.location.pathname !== '/auth/register') {
         window.location.href = '/auth/login';
