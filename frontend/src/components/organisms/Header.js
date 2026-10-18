@@ -81,6 +81,7 @@ const Header = () => {
                   variant="outline"
                   onClick={() => setProfileMenuOpen(!profileMenuOpen)}
                   className="flex items-center space-x-2"
+                  data-testid="header-user-menu"
                 >
                   <User className="h-4 w-4" />
                   <span>{user.name}</span>
@@ -106,6 +107,7 @@ const Header = () => {
                     <button
                       onClick={handleLogout}
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      data-testid="header-logout"
                     >
                       <LogOut className="h-4 w-4 mr-2" />
                       退出登录
@@ -116,10 +118,10 @@ const Header = () => {
             ) : (
               <div className="flex items-center space-x-4">
                 <Link to="/auth/login">
-                  <Button variant="outline">登录</Button>
+                  <Button variant="outline" data-testid="header-login">登录</Button>
                 </Link>
                 <Link to="/auth/register">
-                  <Button>注册</Button>
+                  <Button data-testid="header-register">注册</Button>
                 </Link>
               </div>
             )}

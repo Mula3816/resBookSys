@@ -129,6 +129,7 @@ const RestaurantsPage = () => {
               value={searchDebounce}
               onChange={(e) => handleSearch(e.target.value)}
               className="pl-10"
+              data-testid="restaurants-search"
             />
             {searchDebounce && (
               <button
@@ -191,6 +192,7 @@ const RestaurantsPage = () => {
               <button
                 key={cuisine.name}
                 onClick={() => handleCuisineFilter(cuisine.name)}
+                data-testid={`cuisine-${cuisine.name}`}
                 className={`px-4 py-2 rounded-full text-sm font-medium transition-all transform hover:scale-105 flex items-center space-x-2 ${
                   filters.cuisine_type === cuisine.name
                     ? 'bg-primary-600 text-white shadow-lg'
@@ -251,7 +253,7 @@ const RestaurantsPage = () => {
         <>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {restaurants.map((restaurant) => (
-              <Card key={restaurant.id} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
+              <Card key={restaurant.id} data-testid={`restaurant-card-${restaurant.id}`} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                 <div 
                   className="h-48 bg-gradient-to-br from-primary-400 to-primary-600 relative"
                   onClick={() => navigate(`/restaurants/${restaurant.id}`)}

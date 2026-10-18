@@ -277,6 +277,7 @@ const RestaurantDetailPage = () => {
                   onChange={(e) => setSelectedDate(e.target.value)}
                   min={new Date().toISOString().split('T')[0]}
                   className="input"
+                  data-testid="detail-date"
                 />
               </div>
 
@@ -288,6 +289,7 @@ const RestaurantDetailPage = () => {
                   value={partySize}
                   onChange={(e) => setPartySize(parseInt(e.target.value))}
                   className="input"
+                  data-testid="detail-party-size"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
                     <option key={num} value={num}>
@@ -302,6 +304,7 @@ const RestaurantDetailPage = () => {
                 disabled={loadingAvailability || !selectedDate}
                 loading={loadingAvailability}
                 className="w-full"
+                data-testid="detail-check-availability"
               >
                 查询可订时段
               </Button>
@@ -329,6 +332,7 @@ const RestaurantDetailPage = () => {
                     onClick={handleBooking}
                     className="w-full"
                     disabled={!user}
+                    data-testid="detail-continue-booking"
                   >
                     {user ? '继续预订' : '登录后预订'}
                   </Button>

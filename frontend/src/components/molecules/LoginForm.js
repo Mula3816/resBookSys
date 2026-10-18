@@ -43,6 +43,7 @@ const LoginForm = () => {
             label="邮箱"
             type="email"
             placeholder="your@email.com"
+            data-testid="login-email"
             {...register('email', {
               required: '请输入邮箱',
               pattern: {
@@ -59,6 +60,7 @@ const LoginForm = () => {
             label="密码"
             type="password"
             placeholder="••••••••"
+            data-testid="login-password"
             {...register('password', {
               required: '请输入密码',
               minLength: {
@@ -75,6 +77,7 @@ const LoginForm = () => {
           className="w-full"
           loading={loading}
           disabled={loading}
+          data-testid="login-submit"
         >
           登录
         </Button>

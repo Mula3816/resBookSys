@@ -93,6 +93,7 @@ const RegisterForm = () => {
             label="姓名"
             type="text"
             placeholder="张三"
+            data-testid="register-name"
             {...register('name', {
               required: '请输入姓名',
               minLength: {
@@ -109,6 +110,7 @@ const RegisterForm = () => {
             label="邮箱"
             type="email"
             placeholder="your@email.com"
+            data-testid="register-email"
             {...register('email', {
               required: '请输入邮箱',
               pattern: {
@@ -125,6 +127,7 @@ const RegisterForm = () => {
             label="电话（选填）"
             type="tel"
             placeholder="13800000000"
+            data-testid="register-phone"
             {...register('phone', {
               // 选填字段：空值直接通过，仅在有输入时校验格式
               validate: (value) => !value || /^\+?[1-9]\d{1,14}$/.test(value) || '电话格式不正确'
@@ -138,6 +141,7 @@ const RegisterForm = () => {
             label="密码"
             type="password"
             placeholder="••••••••"
+            data-testid="register-password"
             {...register('password', {
               required: '请输入密码',
               minLength: {
@@ -154,6 +158,7 @@ const RegisterForm = () => {
             label="确认密码"
             type="password"
             placeholder="••••••••"
+            data-testid="register-confirm-password"
             {...register('confirmPassword', {
               required: '请确认密码',
               validate: value => value === password || '两次输入的密码不一致'
@@ -167,6 +172,7 @@ const RegisterForm = () => {
           className="w-full"
           loading={loading}
           disabled={loading}
+          data-testid="register-submit"
         >
           创建账号
         </Button>

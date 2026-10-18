@@ -259,6 +259,7 @@ const ReservationsPage = () => {
                       <Button
                         variant="danger"
                         size="sm"
+                        data-testid={`reservation-cancel-${reservation.id}`}
                         onClick={() => handleCancelReservation(reservation.id)}
                       >
                         <X className="h-4 w-4" />

@@ -128,6 +128,7 @@ const BookingPage = () => {
                       <button
                         key={slot.time}
                         type="button"
+                        data-testid={`booking-slot-${slot.time}`}
                         onClick={() => handleTimeSelect(slot.time)}
                         className={`p-3 text-sm font-medium rounded-lg border transition-colors ${
                           selectedTime === slot.time
@@ -175,7 +176,7 @@ const BookingPage = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     场合（选填）
                   </label>
-                  <select {...register('occasion')} className="input">
+                  <select {...register('occasion')} className="input" data-testid="booking-occasion">
                     <option value="">请选择场合</option>
                     <option value="生日">生日</option>
                     <option value="周年纪念">周年纪念</option>
@@ -214,6 +215,7 @@ const BookingPage = () => {
                   loading={loading}
                   disabled={!selectedTime || !selectedTable}
                   className="w-full"
+                  data-testid="booking-submit"
                 >
                   {loading ? '处理中...' : '确认预订'}
                 </Button>
